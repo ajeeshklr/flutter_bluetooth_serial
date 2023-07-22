@@ -1024,11 +1024,14 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
                     }, address), new IAsyncCallback<Integer>() {
                         @Override
                         public void onDone(Integer id) {
+                            System.out.println(String.format("Connected. Id received is %d", id));
                             activity.runOnUiThread(() -> result.success(id));
                         }
 
                         @Override
                         public void onException(Exception ex) {
+                            System.out.println(String.format("Connection failed. Exception received is %s and stack trace is %s", ex.getMessage(), exceptionToString(ex)));
+
                             activity.runOnUiThread(() -> result.error("connect_error", ex.getMessage(), exceptionToString(ex)));
                             connections.remove(id);
                         }

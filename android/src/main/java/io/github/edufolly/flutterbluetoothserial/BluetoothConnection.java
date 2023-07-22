@@ -1,14 +1,14 @@
 package io.github.edufolly.flutterbluetoothserial;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.UUID;
-import java.util.Arrays;
-
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.UUID;
 
 /// Universal Bluetooth serial connection class (for Java)
 public abstract class BluetoothConnection
@@ -113,21 +113,29 @@ public abstract class BluetoothConnection
         /// Thread main code
         public void run() {
             byte[] buffer = new byte[1024];
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                int maximumPacketSize = this.socket.getMaxReceivePacketSize();
+                if(maximumPacketSize > 0){
+                    buffer = new byte[maximumPacketSize];
+                }
+                System.out.println(String.format("The read buffer size received is %d", maximumPacketSize));
+            }
             int bytes;
 
             while (!requestedClosing) {
                 try {
                     bytes = input.read(buffer);
-
-                    onRead(Arrays.copyOf(buffer, bytes));
-                    sleep(20, 0);
-
+                    if(bytes > 0) {
+                        onRead(Arrays.copyOf(buffer, bytes));
+                    }
+//                    sleep(50);
                 } catch (IOException e) {
                     // `input.read` throws when closed by remote device
                     break;
-                } catch(InterruptedException ex){
-                    break;
                 }
+//                catch(InterruptedException ex){
+//                    break;
+//                }
             }
 
             // Make sure output stream is closed
@@ -167,6 +175,7 @@ public abstract class BluetoothConnection
             if (requestedClosing) {
                 return;
             }
+            System.out.println("Request for disconnect is received!");
             requestedClosing = true;
 
             // Flush output buffers befoce closing
