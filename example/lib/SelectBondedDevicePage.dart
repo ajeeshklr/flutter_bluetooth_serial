@@ -17,6 +17,7 @@ class SelectBondedDevicePage extends StatefulWidget {
 }
 
 enum _DeviceAvailability {
+  // ignore: unused_field
   no,
   maybe,
   yes,
@@ -27,6 +28,7 @@ class _DeviceWithAvailability {
   _DeviceAvailability availability;
   int? rssi;
 
+  // ignore: unused_element
   _DeviceWithAvailability(this.device, this.availability, [this.rssi]);
 }
 
