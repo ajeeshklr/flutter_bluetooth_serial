@@ -18,8 +18,8 @@ import androidx.core.content.ContextCompat;
 
 import android.util.Log;
 import android.util.SparseArray;
-import android.os.AsyncTask;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Enumeration;
@@ -319,7 +319,7 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
         messenger = binding.getBinaryMessenger();
 
         methodChannel = new MethodChannel(messenger, PLUGIN_NAMESPACE + "/methods");
-        methodChannel.setMethodCallHandler( new FlutterBluetoothSerialMethodCallHandler() );
+        methodChannel.setMethodCallHandler(new FlutterBluetoothSerialMethodCallHandler());
 
         EventChannel stateChannel = new EventChannel(messenger, PLUGIN_NAMESPACE + "/state");
 
@@ -509,14 +509,30 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
                 public void onCancel(Object o) {
                     // If canceled by local, disconnects - in other case, by remote, does nothing
                     self.disconnect();
+                    AsyncExecutor.execute(new BluetoothSerialCallable<>(input -> {
+                        readChannel.setStreamHandler(null);
+                        return null;
+                    }, null), new IAsyncCallback<Object>() {
+                        @Override
+                        public void onDone(Object result) {
+                            connections.remove(id);
+                            Log.d(TAG, "Disconnected (id: " + id + ")");
+                        }
+
+                        @Override
+                        public void onException(Exception ex) {
+                            connections.remove(id);
+                            Log.d(TAG, "Disconnected (id: " + id + ")");
+                        }
+                    });
 
                     // True dispose
-                    AsyncTask.execute(() -> {
-                        readChannel.setStreamHandler(null);
-                        connections.remove(id);
-
-                        Log.d(TAG, "Disconnected (id: " + id + ")");
-                    });
+//                    AsyncTask.execute(() -> {
+//                        readChannel.setStreamHandler(null);
+//                        connections.remove(id);
+//
+//                        Log.d(TAG, "Disconnected (id: " + id + ")");
+//                    });
                 }
             };
             readChannel.setStreamHandler(readStreamHandler);
@@ -1002,15 +1018,22 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
 
                     Log.d(TAG, "Connecting to " + address + " (id: " + id + ")");
 
-                    AsyncTask.execute(() -> {
-                        try {
-                            connection.connect(address);
+                    AsyncExecutor.execute(new BluetoothSerialCallable<>(input -> {
+                        connection.connect(input);
+                        return id;
+                    }, address), new IAsyncCallback<Integer>() {
+                        @Override
+                        public void onDone(Integer id) {
                             activity.runOnUiThread(() -> result.success(id));
-                        } catch (Exception ex) {
+                        }
+
+                        @Override
+                        public void onException(Exception ex) {
                             activity.runOnUiThread(() -> result.error("connect_error", ex.getMessage(), exceptionToString(ex)));
                             connections.remove(id);
                         }
                     });
+
                     break;
                 }
 
@@ -1036,21 +1059,38 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
 
                     if (call.hasArgument("string")) {
                         String string = call.argument("string");
-                        AsyncTask.execute(() -> {
-                            try {
-                                connection.write(string.getBytes());
-                                activity.runOnUiThread(() -> result.success(null));
-                            } catch (Exception ex) {
+
+                        AsyncExecutor.execute(new BluetoothSerialCallable<>(input -> {
+                            connection.write(input.getBytes());
+                            return null;
+                        }, string), new IAsyncCallback<Object>() {
+                            @Override
+                            public void onDone(Object res) {
+                                activity.runOnUiThread(() -> result.success(res));
+                            }
+
+                            @Override
+                            public void onException(Exception ex) {
                                 activity.runOnUiThread(() -> result.error("write_error", ex.getMessage(), exceptionToString(ex)));
                             }
                         });
+
                     } else if (call.hasArgument("bytes")) {
                         byte[] bytes = call.argument("bytes");
-                        AsyncTask.execute(() -> {
-                            try {
-                                connection.write(bytes);
-                                activity.runOnUiThread(() -> result.success(null));
-                            } catch (Exception ex) {
+                        AsyncExecutor.execute(new BluetoothSerialCallable<>(new IAsyncOperation<byte[], Object>() {
+                            @Override
+                            public Object execute(byte[] input) throws IOException {
+                                connection.write(input);
+                                return null;
+                            }
+                        }, bytes), new IAsyncCallback<Object>() {
+                            @Override
+                            public void onDone(Object res) {
+                                activity.runOnUiThread(() -> result.success(res));
+                            }
+
+                            @Override
+                            public void onException(Exception ex) {
                                 activity.runOnUiThread(() -> result.error("write_error", ex.getMessage(), exceptionToString(ex)));
                             }
                         });
