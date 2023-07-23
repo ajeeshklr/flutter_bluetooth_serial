@@ -11,8 +11,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 /// Universal Bluetooth serial connection class (for Java)
-public abstract class BluetoothConnection
-{
+public abstract class BluetoothConnection {
     protected static final UUID DEFAULT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     protected BluetoothAdapter bluetoothAdapter;
@@ -24,11 +23,9 @@ public abstract class BluetoothConnection
     }
 
 
-
     public BluetoothConnection(BluetoothAdapter bluetoothAdapter) {
         this.bluetoothAdapter = bluetoothAdapter;
     }
-
 
 
     // @TODO . `connect` could be done perfored on the other thread
@@ -59,11 +56,12 @@ public abstract class BluetoothConnection
         connectionThread = new ConnectionThread(socket);
         connectionThread.start();
     }
+
     /// Connects to given device by hardware address (default UUID used)
     public void connect(String address) throws IOException {
         connect(address, DEFAULT_UUID);
     }
-    
+
     /// Disconnects current session (ignore if not connected)
     public void disconnect() {
         if (isConnected()) {
@@ -88,12 +86,12 @@ public abstract class BluetoothConnection
     protected abstract void onDisconnected(boolean byRemote);
 
     /// Thread to handle connection I/O
-    private class ConnectionThread extends Thread  {
+    private class ConnectionThread extends Thread {
         private final BluetoothSocket socket;
         private final InputStream input;
         private final OutputStream output;
         private boolean requestedClosing = false;
-        
+
         ConnectionThread(BluetoothSocket socket) {
             this.socket = socket;
             InputStream tmpIn = null;
@@ -112,11 +110,12 @@ public abstract class BluetoothConnection
 
         /// Thread main code
         public void run() {
-            byte[] buffer = new byte[1024];
+            int size = 1024;
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                 int maximumPacketSize = this.socket.getMaxReceivePacketSize();
-                if(maximumPacketSize > 0){
-                    buffer = new byte[maximumPacketSize];
+                if (maximumPacketSize > 0) {
+                    size = maximumPacketSize;
                 }
                 System.out.println(String.format("The read buffer size received is %d", maximumPacketSize));
             }
@@ -124,34 +123,52 @@ public abstract class BluetoothConnection
 
             while (!requestedClosing) {
                 try {
-                    bytes = input.read(buffer);
-                    if(bytes > 0) {
-                        onRead(Arrays.copyOf(buffer, bytes));
+
+//                    bytes = input.read(buffer);
+//                    if (bytes > 0) {
+//
+//                        onRead(Arrays.copyOf(buffer, bytes));
+//                        System.out.println(String.format("Total bytes read is %d", bytes));
+//                    } else {
+//                        sleep(100);
+//                    }
+
+                    int available = input.available();
+                    byte[] buff = new byte[size < available ? available + 100 : size];
+                    int offset = 0;
+                    while (available > 0 && (offset + available) < buff.length) {
+                        bytes = input.read(buff, offset, available);
+                        offset += bytes;
+                        available = input.available();
                     }
-//                    sleep(50);
+                    if (offset > 0) {
+//                        System.out.println(String.format("Total bytes read is %d", offset));
+                        onRead(Arrays.copyOf(buff, offset));
+                    } else {
+                        sleep(10);
+                    }
                 } catch (IOException e) {
                     // `input.read` throws when closed by remote device
                     break;
+                } catch (InterruptedException ex) {
+                    break;
                 }
-//                catch(InterruptedException ex){
-//                    break;
-//                }
             }
 
             // Make sure output stream is closed
             if (output != null) {
                 try {
                     output.close();
+                } catch (Exception e) {
                 }
-                catch (Exception e) {}
             }
 
             // Make sure input stream is closed
             if (input != null) {
                 try {
                     input.close();
+                } catch (Exception e) {
                 }
-                catch (Exception e) {}
             }
 
             // Callback on disconnected, with information which side is closing
@@ -165,6 +182,7 @@ public abstract class BluetoothConnection
         public void write(byte[] bytes) {
             try {
                 output.write(bytes);
+                output.flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -181,8 +199,8 @@ public abstract class BluetoothConnection
             // Flush output buffers befoce closing
             try {
                 output.flush();
+            } catch (Exception e) {
             }
-            catch (Exception e) {}
 
             // Close the connection socket
             if (socket != null) {
@@ -191,8 +209,8 @@ public abstract class BluetoothConnection
                     Thread.sleep(111);
 
                     socket.close();
+                } catch (Exception e) {
                 }
-                catch (Exception e) {}
             }
         }
     }
