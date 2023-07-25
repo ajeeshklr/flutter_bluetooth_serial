@@ -123,16 +123,6 @@ public abstract class BluetoothConnection {
 
             while (!requestedClosing) {
                 try {
-
-//                    bytes = input.read(buffer);
-//                    if (bytes > 0) {
-//
-//                        onRead(Arrays.copyOf(buffer, bytes));
-//                        System.out.println(String.format("Total bytes read is %d", bytes));
-//                    } else {
-//                        sleep(100);
-//                    }
-
                     int available = input.available();
                     byte[] buff = new byte[size < available ? available + 100 : size];
                     int offset = 0;
@@ -142,15 +132,10 @@ public abstract class BluetoothConnection {
                         available = input.available();
                     }
                     if (offset > 0) {
-//                        System.out.println(String.format("Total bytes read is %d", offset));
                         onRead(Arrays.copyOf(buff, offset));
-                    } else {
-                        sleep(10);
                     }
                 } catch (IOException e) {
                     // `input.read` throws when closed by remote device
-                    break;
-                } catch (InterruptedException ex) {
                     break;
                 }
             }

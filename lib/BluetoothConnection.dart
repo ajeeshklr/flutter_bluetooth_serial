@@ -99,6 +99,7 @@ class _BluetoothStreamSink<Uint8List> extends StreamSink<Uint8List> {
 
   /// Chain of features, the variable represents last of the futures.
   Future<void> _chainedFutures = Future.value(/* Empty future :F */);
+  List<Future<void>> _addedFutures = new List.empty(growable: true);
 
   late Future<dynamic> _doneFuture;
 
@@ -129,22 +130,23 @@ class _BluetoothStreamSink<Uint8List> extends StreamSink<Uint8List> {
   ///
   /// Might throw `StateError("Not connected!")` if not connected.
   @override
-  void add(Uint8List data) {
+  void add(Uint8List data) async {
     if (!isConnected) {
       throw StateError("Not connected!");
     }
 
-    _chainedFutures = _chainedFutures.then((_) async {
-      if (!isConnected) {
-        throw StateError("Not connected!");
-      }
+    Future f = FlutterBluetoothSerial._methodChannel
+        .invokeMethod('write', {'id': _id, 'bytes': data});
+    _addedFutures.add(f);
 
-      await FlutterBluetoothSerial._methodChannel
-          .invokeMethod('write', {'id': _id, 'bytes': data});
-    }).catchError((e) {
+    try {
+      await f;
+    } on Exception catch (e) {
       this.exception = e;
       close();
-    });
+    } finally {
+      _addedFutures.remove(f);
+    }
   }
 
   /// Unsupported - this ouput sink cannot pass errors to platfom code.
@@ -191,11 +193,10 @@ class _BluetoothStreamSink<Uint8List> extends StreamSink<Uint8List> {
         // Simple `await` can't get job done here, because the `_chainedFutures` member
         // in one access time provides last Future, then `await`ing for it allows the library
         // user to add more futures on top of the waited-out Future.
-        Future lastFuture;
-        do {
-          lastFuture = this._chainedFutures;
-          await lastFuture;
-        } while (lastFuture != this._chainedFutures);
+        while (_addedFutures.isNotEmpty) {
+          Future f = _addedFutures.first;
+          await f;
+        }
 
         if (this.exception != null) {
           throw this.exception;
