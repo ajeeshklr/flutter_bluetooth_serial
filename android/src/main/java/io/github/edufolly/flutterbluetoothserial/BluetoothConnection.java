@@ -4,10 +4,13 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 /// Universal Bluetooth serial connection class (for Java)
@@ -18,15 +21,13 @@ public abstract class BluetoothConnection {
 
     protected ConnectionThread connectionThread = null;
 
-    public boolean isConnected() {
-        return connectionThread != null && connectionThread.requestedClosing != true;
-    }
-
-
     public BluetoothConnection(BluetoothAdapter bluetoothAdapter) {
         this.bluetoothAdapter = bluetoothAdapter;
     }
 
+    public boolean isConnected() {
+        return connectionThread != null && !connectionThread.requestedClosing;
+    }
 
     // @TODO . `connect` could be done perfored on the other thread
     // @TODO . `connect` parameter: timeout
@@ -94,6 +95,7 @@ public abstract class BluetoothConnection {
 
         ConnectionThread(BluetoothSocket socket) {
             this.socket = socket;
+
             InputStream tmpIn = null;
             OutputStream tmpOut = null;
 
@@ -117,21 +119,24 @@ public abstract class BluetoothConnection {
                 if (maximumPacketSize > 0) {
                     size = maximumPacketSize;
                 }
-                System.out.println(String.format("The read buffer size received is %d", maximumPacketSize));
+                System.out.printf("The read buffer size received is %d%n", maximumPacketSize);
             }
             int bytes;
+            int offset = 0;
+
+            byte[] buff = new byte[size];
 
             while (!requestedClosing) {
                 try {
-                    int available = input.available();
-                    byte[] buff = new byte[size < available ? available + 100 : size];
-                    int offset = 0;
-                    while (available > 0 && (offset + available) < buff.length) {
-                        bytes = input.read(buff, offset, available);
-                        offset += bytes;
-                        available = input.available();
-                    }
-                    if (offset > 0) {
+                    bytes = input.read(buff);
+                    if (bytes > 0) {
+                        int toRead = size - bytes;
+                        offset = bytes;
+                        while (input.available() > 0) {
+                            bytes = input.read(buff, offset, toRead);
+                            offset += bytes;
+                            toRead = size - offset;
+                        }
                         onRead(Arrays.copyOf(buff, offset));
                     }
                 } catch (IOException e) {
