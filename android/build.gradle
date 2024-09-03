@@ -1,3 +1,8 @@
+plugins {
+    id 'com.android.library'
+    id 'kotlin-android'
+}
+
 group 'io.github.edufolly.flutterbluetoothserial'
 version '1.0-SNAPSHOT'
 
@@ -18,11 +23,6 @@ allprojects {
         google()
         mavenCentral()  // Ensure compatibility with modern libraries
     }
-}
-
-plugins {
-    id 'com.android.library'
-    id 'kotlin-android'
 }
 
 android {
